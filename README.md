@@ -65,8 +65,8 @@ TELEGRAM_CHANNEL=
 1. Push a release tag such as `v1.0.0` to GitHub.
 2. The GitHub Actions workflow publishes `ghcr.io/pdpablo/spook-shack-v2:v1.0.0` when a tag beginning with `v` is pushed.
 3. In Hostinger Docker Manager, use `docker-compose.hostinger.yml`.
-4. Paste the environment variables above into hPanel.
-5. Attach your domain `spook-shack.com` to the container service.
+4. Set `SPOOK_SHACK_V2_IMAGE_TAG=v1.0.0` in hPanel so it pulls the published release image.
+5. Attach your domain `spook-shack.com` (and optionally `www.spook-shack.com`) to the container service.
 
 ## Notes
 
