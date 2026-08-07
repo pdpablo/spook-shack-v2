@@ -1,0 +1,120 @@
+{
+  "name": "IntelReport",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "period": {
+      "type": "string",
+      "enum": [
+        "weekly",
+        "monthly",
+        "quarterly",
+        "annually"
+      ],
+      "default": "weekly"
+    },
+    "period_start": {
+      "type": "string"
+    },
+    "period_end": {
+      "type": "string"
+    },
+    "executive_summary": {
+      "type": "string"
+    },
+    "key_findings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "threat_landscape": {
+      "type": "string"
+    },
+    "notable_actors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "targeted_sectors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "targeted_geographies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "indicators": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assessment_outlook": {
+      "type": "string"
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sources_methodology": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "low",
+        "moderate",
+        "high"
+      ],
+      "default": "moderate"
+    },
+    "items_analyzed": {
+      "type": "number",
+      "default": 0
+    },
+    "author_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "period"
+  ],
+  "rls": {
+    "read": {},
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

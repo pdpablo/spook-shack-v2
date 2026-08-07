@@ -1,0 +1,109 @@
+{
+  "name": "IntelItem",
+  "type": "object",
+  "properties": {
+    "source_slug": {
+      "type": "string"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "source_kind": {
+      "type": "string"
+    },
+    "item_type": {
+      "type": "string",
+      "enum": [
+        "ip",
+        "domain",
+        "url",
+        "hash",
+        "email",
+        "victim",
+        "breach",
+        "leak",
+        "article",
+        "other"
+      ],
+      "default": "other"
+    },
+    "value": {
+      "type": "string",
+      "description": "normalized correlatable value (indicator, org name, breach name)"
+    },
+    "title": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "threat_actor": {
+      "type": "string"
+    },
+    "victim_org": {
+      "type": "string"
+    },
+    "sector": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium"
+    },
+    "published_date": {
+      "type": "string"
+    },
+    "link": {
+      "type": "string"
+    },
+    "dedupe_key": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "unreviewed",
+        "true_positive",
+        "false_positive",
+        "needs_info"
+      ],
+      "default": "unreviewed"
+    },
+    "raw_meta": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "source_slug",
+    "value"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

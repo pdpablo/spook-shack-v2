@@ -1,0 +1,95 @@
+{
+  "name": "IntelSource",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string",
+      "description": "unique short key, e.g. ransomware_live"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "ransomware_live",
+        "ransomware_pro",
+        "tweetfeed",
+        "phishunt",
+        "hibp",
+        "telegram",
+        "rss",
+        "other"
+      ],
+      "default": "rss"
+    },
+    "url": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "proposed",
+        "error"
+      ],
+      "default": "active"
+    },
+    "license_note": {
+      "type": "string",
+      "description": "acceptable use / attribution note"
+    },
+    "min_interval_minutes": {
+      "type": "number",
+      "default": 720
+    },
+    "max_items_per_run": {
+      "type": "number",
+      "default": 150
+    },
+    "requires_secret": {
+      "type": "string"
+    },
+    "last_ingested_at": {
+      "type": "string"
+    },
+    "last_status": {
+      "type": "string"
+    },
+    "total_items": {
+      "type": "number",
+      "default": 0
+    },
+    "discovered_by_crawler": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "name",
+    "slug",
+    "kind"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

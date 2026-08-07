@@ -1,0 +1,58 @@
+{
+  "name": "ItemNote",
+  "type": "object",
+  "properties": {
+    "item_id": {
+      "type": "string"
+    },
+    "item_value": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "true_positive",
+        "false_positive",
+        "needs_info"
+      ],
+      "default": "needs_info"
+    },
+    "note": {
+      "type": "string"
+    },
+    "analyst_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "item_id",
+    "verdict"
+  ],
+  "rls": {
+    "read": {},
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

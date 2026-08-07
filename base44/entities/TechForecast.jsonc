@@ -1,0 +1,121 @@
+{
+  "name": "TechForecast",
+  "type": "object",
+  "properties": {
+    "tech_name": {
+      "type": "string"
+    },
+    "classification": {
+      "type": "string",
+      "description": "e.g. AI/ML, quantum, wireless, biotech interface, edge compute"
+    },
+    "maturity": {
+      "type": "string",
+      "enum": [
+        "research",
+        "prototype",
+        "unreleased",
+        "early_release"
+      ],
+      "default": "research"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "related_existing_tech": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "existing_attack_vectors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "predicted_abuse": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "likely_threat_actors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mitigations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_score": {
+      "type": "number",
+      "description": "1-10"
+    },
+    "horizon": {
+      "type": "string",
+      "enum": [
+        "0-6 months",
+        "6-18 months",
+        "18-36 months",
+        "3+ years"
+      ],
+      "default": "6-18 months"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "low",
+        "moderate",
+        "high"
+      ],
+      "default": "moderate"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "agent_name": {
+      "type": "string",
+      "default": "Hermes"
+    }
+  },
+  "required": [
+    "tech_name"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

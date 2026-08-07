@@ -1,0 +1,57 @@
+{
+  "name": "IngestionRun",
+  "type": "object",
+  "properties": {
+    "source_slug": {
+      "type": "string"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "skipped",
+        "error"
+      ],
+      "default": "success"
+    },
+    "items_fetched": {
+      "type": "number",
+      "default": 0
+    },
+    "items_new": {
+      "type": "number",
+      "default": 0
+    },
+    "message": {
+      "type": "string"
+    },
+    "duration_ms": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "source_slug",
+    "status"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
