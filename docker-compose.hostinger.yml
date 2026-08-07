@@ -1,6 +1,6 @@
 services:
   web:
-    image: ghcr.io/pdpablo/spook-shack-v2:${SPOOK_SHACK_V2_IMAGE_TAG:-latest}
+    build: .
     restart: unless-stopped
     labels:
       - traefik.enable=true
