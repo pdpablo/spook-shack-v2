@@ -26,7 +26,7 @@ export default function FeedFilters({ q, setQ, type, setType, verdict, setVerdic
       </select>
       <select className={sel} value={type} onChange={(e) => setType(e.target.value)}>
         <option value="">all types</option>
-        {["ip", "domain", "url", "hash", "email", "victim", "breach", "leak", "article", "other"].map((t) => (
+        {["ip", "domain", "url", "hash", "email", "victim", "breach", "leak", "vulnerability", "article", "other"].map((t) => (
           <option key={t} value={t}>
             {t}
           </option>

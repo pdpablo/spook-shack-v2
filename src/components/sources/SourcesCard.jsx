@@ -19,6 +19,9 @@ export default function SourceCard({ source, isAdmin, busy, onIngest, onToggle, 
             {source.name}
           </Link>
           <p className="mt-1 text-[10px] font-mono text-muted-foreground/80">{source.url}</p>
+          {source.kind === "telegram" && source.telegram_channel && (
+            <p className="mt-1 text-[10px] font-mono text-accent/80">channel: {source.telegram_channel}</p>
+          )}
         </div>
         <span className={`text-[9px] font-mono stencil px-2 py-1 border shrink-0 ${STATUS[source.status] || ""}`}>
           {source.status}

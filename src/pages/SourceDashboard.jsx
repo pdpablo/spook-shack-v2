@@ -53,6 +53,11 @@ export default function SourceDashboard() {
         title={source?.name || slug}
         subtitle={source?.description}
       />
+      {source?.kind === "telegram" && source?.telegram_channel && (
+        <p className="mb-4 text-[11px] font-mono text-accent/80 border-l border-accent/40 pl-3">
+          telegram channel: {source.telegram_channel}
+        </p>
+      )}
       {source?.license_note && (
         <p className="mb-6 text-[11px] font-mono text-accent/80 border-l border-accent/40 pl-3">{source.license_note}</p>
       )}

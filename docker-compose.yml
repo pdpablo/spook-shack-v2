@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    image: ghcr.io/pdpablo/spook-shack-v2:${SPOOK_SHACK_V2_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      VITE_BASE44_APP_ID: ${VITE_BASE44_APP_ID:-}
+      VITE_BASE44_APP_BASE_URL: ${VITE_BASE44_APP_BASE_URL:-https://your-app.base44.app}
+      VITE_BASE44_FUNCTIONS_VERSION: ${VITE_BASE44_FUNCTIONS_VERSION:-}

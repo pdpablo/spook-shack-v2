@@ -4,8 +4,8 @@ import { base44 } from "@/api/base44Client";
 import PageHeader from "@/components/ui-spook/PageHeader";
 import Panel from "@/components/ui-spook/Panel";
 import Loader from "@/components/ui-spook/Loader";
-import SourceCard from "@/components/sources/SourceCard";
-import SourceForm from "@/components/sources/SourceForm";
+import SourceCard from "@/components/sources/SourcesCard";
+import SourceForm from "@/components/sources/SourcesForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe } from "@/components/hooks/useMe";
@@ -68,12 +68,12 @@ export default function Sources() {
       <PageHeader
         eyebrow="collection"
         title="Intelligence Sources"
-        subtitle="Each source is polled no more often than its own acceptable-use window allows. Attribution and licence notes travel with the data."
+        subtitle="Each source is polled no more often than its own acceptable-use window allows. Attribution and licence notes travel with the data, including Telegram channels for vulnerability tracking."
       >
         {isAdmin && (
           <>
             <Button variant="outline" onClick={() => setShowForm(true)} className="font-mono stencil text-[10px]">
-              <Plus className="w-3.5 h-3.5 mr-1" /> add feed
+              <Plus className="w-3.5 h-3.5 mr-1" /> add source
             </Button>
             <Button disabled={busy === "all"} onClick={() => pull(null)} className="font-mono stencil text-[10px]">
               <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy === "all" ? "animate-spin" : ""}`} /> pull all due
@@ -88,7 +88,7 @@ export default function Sources() {
             <Input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="topic to hunt for, e.g. APT infrastructure, malware IOCs, phishing kits"
+              placeholder="topic to hunt for, e.g. APT infrastructure, malware IOCs, phishing kits, vulnerability channels"
               className="bg-background border-border font-mono text-xs"
             />
             <Button disabled={crawling} onClick={crawl} className="font-mono stencil text-[10px] shrink-0">

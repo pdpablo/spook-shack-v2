@@ -26,6 +26,10 @@
     "url": {
       "type": "string"
     },
+    "telegram_channel": {
+      "type": "string",
+      "description": "Telegram channel handle or t.me/s URL for telegram sources"
+    },
     "description": {
       "type": "string"
     },

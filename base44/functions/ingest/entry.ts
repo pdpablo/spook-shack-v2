@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { secrets } from 'base44:runtime';
 import { nowIso, saveItems } from '../../shared/intel.ts';
-import { fetchSource } from '../../shared/fetchers.ts';
+import { fetchSource } from '../../shared/fetcher.ts';
 
 export default async function (req: Request): Promise<Response> {
   try {

@@ -1,77 +1,60 @@
-# Base44 Project
+# Spook Shack V2
 
-Use this repository to run and edit the app locally, then publish changes back through Base44.
+Spook Shack V2 is a Base44-powered threat-intelligence workspace for ingesting public and approved CTI sources, normalizing records, and reviewing them through analyst-friendly dashboards.
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+## Features
 
-## Prerequisites
+- Source registry for RSS, Telegram, and other intel feeds
+- Scheduled ingestion with per-source rate limits
+- Telegram channel ingestion for vulnerability alerts and CVE posts
+- Feed filtering, source dashboards, and correlation views
+- Docker-first deployment
 
-1. Clone the repository using the project's Git URL.
-2. Navigate to the project directory.
-3. Install dependencies: `npm install`.
-4. Install the Base44 CLI: `npm install -g base44@latest`.
-
-See the [Base44 CLI docs](https://docs.base44.com/developers/references/cli/get-started/overview) if you want to run Base44 commands directly.
-
-## Run Locally
-
-Run the full local development environment from the project root:
+## Local development
 
 ```bash
-base44 dev
-```
-
-`base44 dev` starts the local Base44 development backend and, when this app is configured for it, also starts the frontend dev server for you. Use the frontend URL printed by the command.
-
-For example, when the Base44 project config includes a `serveCommand`, `base44 dev` can launch the frontend too:
-
-```json5
-{
-  "site": {
-    "serveCommand": "npm run dev"
-  }
-}
-```
-
-In a Base44 project this lives in `base44/config.jsonc`.
-
-## Run Only The Frontend
-
-If you only want to work on the frontend against the hosted Base44 backend, run:
-
-```bash
+npm install
+npm run build
 npm run dev
 ```
 
-Open the local URL printed by Vite.
+For the Base44 local backend, use the Base44 CLI workflow described in `AGENTS.md` and `README`-embedded Base44 docs.
 
-## Use The Hosted Backend
+## Docker
 
-For frontend-only development, create or update `.env.local` in the project root:
+### Local
 
 ```bash
-VITE_BASE44_APP_ID=your_app_id
+docker compose up --build
+```
+
+Open:
+
+- http://127.0.0.1:8080
+
+### Environment variables
+
+Set these in `.env` or your platform's environment editor:
+
+```env
+SPOOK_SHACK_V2_IMAGE_TAG=latest
+VITE_BASE44_APP_ID=
 VITE_BASE44_APP_BASE_URL=https://your-app.base44.app
+VITE_BASE44_FUNCTIONS_VERSION=
 ```
 
-`VITE_BASE44_APP_ID` identifies the Base44 app.
+- `VITE_BASE44_APP_BASE_URL` should point at the Base44 app/backend URL your frontend uses.
+- The container writes those values into `/runtime-config.js` at startup so the app can run with runtime config instead of a rebuild.
 
-`VITE_BASE44_APP_BASE_URL` tells the Base44 Vite plugin where to send local `/api` requests. Point it at your deployed Base44 app URL when you want the local frontend to use the hosted backend.
+### Hostinger / GHCR
 
-When you use `base44 dev`, the command injects the local Base44 values for you, so `.env.local` is mainly needed for frontend-only workflows.
+1. Push a release tag such as `v1.0.0` to GitHub.
+2. The GitHub Actions workflow publishes `ghcr.io/pdpablo/spook-shack-v2:v<release>` tag variants on Git tags like `v1.0.0`.
+3. In Hostinger Docker Manager, use `docker-compose.hostinger.yml`.
+4. Paste the environment variables above into hPanel.
+5. Attach your domain `spook-shack.com` to the container service.
 
-## Publish Your Changes
+## Notes
 
-After pushing your changes to git, open the Base44 dashboard and publish the app:
-
-```bash
-base44 dashboard open
-```
-
-## Docs & Support
-
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
-
-Base44 CLI command reference: [https://docs.base44.com/developers/references/cli/commands/introduction](https://docs.base44.com/developers/references/cli/commands/introduction)
-
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+- The frontend still talks to the Base44 backend through the SDK.
+- Docker here packages the app into a deployable web container, while Base44 handles the app data services.

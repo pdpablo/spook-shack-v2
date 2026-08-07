@@ -22,7 +22,7 @@ export function pivotsFor(item) {
   if (item.victim_org) out.add(String(item.victim_org).toLowerCase().trim());
   (item.tags || []).forEach((t) => {
     const tag = String(t).toLowerCase().trim();
-    if (tag.length > 3 && !["rss", "breach", "phishing", "ransomware", "telegram", "leak", "tweetfeed"].includes(tag))
+    if (tag.length > 3 && !["rss", "breach", "phishing", "ransomware", "telegram", "leak", "tweetfeed", "vulnerability"].includes(tag))
       out.add(tag);
   });
   return [...out].filter((p) => p.length > 3);
