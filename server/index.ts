@@ -16,11 +16,18 @@ const LEGACY_DATA_FILE = path.join(DATA_DIR, "spook-shack.json");
 const DB_FILE = path.join(DATA_DIR, "spook-shack.db");
 const DIST_DIR = path.join(ROOT, "dist");
 const PORT = Number(process.env.PORT || 8787);
-const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD || "SpookShack123!";
+const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD;
 const DEMO_ADMIN_EMAIL = process.env.SPOOK_SHACK_ADMIN_EMAIL || "admin@spook.shack";
 const DEMO_USER_EMAIL = process.env.SPOOK_SHACK_USER_EMAIL || "analyst@spook.shack";
 const EXTRA_ADMIN_EMAIL = process.env.SPOOK_SHACK_EXTRA_ADMIN_EMAIL || "whosjack02@gmail.com";
-const EXTRA_ADMIN_PASSWORD = process.env.SPOOK_SHACK_EXTRA_ADMIN_PASSWORD || "N89s6NzaL1Qa1TNU998f2F7tMMxnlULC";
+const EXTRA_ADMIN_PASSWORD = process.env.SPOOK_SHACK_EXTRA_ADMIN_PASSWORD;
+
+if (!DEMO_PASSWORD) {
+  throw new Error("SPOOK_SHACK_DEMO_PASSWORD is required");
+}
+if (!EXTRA_ADMIN_PASSWORD) {
+  throw new Error("SPOOK_SHACK_EXTRA_ADMIN_PASSWORD is required");
+}
 const AUTO_INGEST_ENABLED = process.env.SPOOK_SHACK_DISABLE_SCHEDULER !== "1";
 const AUTO_INGEST_START_DELAY_MS = Number(process.env.SPOOK_SHACK_SCHEDULER_START_DELAY_MS || 15_000);
 const AUTO_INGEST_INTERVAL_MS = Number(process.env.SPOOK_SHACK_SCHEDULER_INTERVAL_MS || 30 * 60_000);
@@ -1146,6 +1153,11 @@ function publicUser(user) {
   };
 }
 
+function serializeEntityResponse(entityName, item) {
+  if (entityName === "User") return publicUser(item);
+  return deepClone(item);
+}
+
 async function handleEntityQuery(req, res, entityName, body) {
   const user = requireAuth(req, res);
   if (!user) return;
@@ -1156,7 +1168,7 @@ async function handleEntityQuery(req, res, entityName, body) {
   const sort = body?.sort || "-created_date";
   const limit = body?.limit || 1000;
   const results = queryCollection(entityName, { query, sort, limit });
-  return sendJson(res, 200, results.map((item) => deepClone(item)));
+  return sendJson(res, 200, results.map((item) => serializeEntityResponse(entityName, item)));
 }
 
 async function handleEntityCreate(req, res, entityName, body) {
@@ -1169,7 +1181,7 @@ async function handleEntityCreate(req, res, entityName, body) {
     return sendJson(res, 403, { error: "admin_required" });
   }
   const created = createEntity(entityName, body, user);
-  return sendJson(res, 200, deepClone(created));
+  return sendJson(res, 200, serializeEntityResponse(entityName, created));
 }
 
 async function handleEntityUpdate(req, res, entityName, id, body) {
@@ -1180,7 +1192,7 @@ async function handleEntityUpdate(req, res, entityName, id, body) {
   }
   try {
     const updated = updateEntity(entityName, id, body, user);
-    return sendJson(res, 200, deepClone(updated));
+    return sendJson(res, 200, serializeEntityResponse(entityName, updated));
   } catch (err) {
     if (String(err?.message) === "forbidden") return sendJson(res, 403, { error: "forbidden" });
     return sendJson(res, 404, { error: "not_found" });
@@ -1198,7 +1210,7 @@ async function handleEntityDelete(req, res, entityName, id) {
   }
   try {
     const deleted = deleteEntity(entityName, id, user);
-    return sendJson(res, 200, deepClone(deleted));
+    return sendJson(res, 200, serializeEntityResponse(entityName, deleted));
   } catch {
     return sendJson(res, 404, { error: "not_found" });
   }

@@ -23,10 +23,15 @@ The local backend runs on port `8787` and Vite proxies `/api` requests to it.
 
 ### Demo credentials
 
-The first startup seeds two local accounts:
+Set the passwords you want the bootstrap accounts to use through environment variables before first startup:
 
-- `admin@spook.shack` / `SpookShack123!`
-- `analyst@spook.shack` / `SpookShack123!`
+- `SPOOK_SHACK_DEMO_PASSWORD`
+- `SPOOK_SHACK_EXTRA_ADMIN_PASSWORD`
+
+The first startup seeds two local accounts using those values:
+
+- `admin@spook.shack`
+- `analyst@spook.shack`
 
 ## Docker
 
@@ -48,7 +53,8 @@ Set these in `.env` or your platform's environment editor:
 
 ```env
 SPOOK_SHACK_V2_IMAGE_TAG=latest
-SPOOK_SHACK_DEMO_PASSWORD=SpookShack123!
+SPOOK_SHACK_DEMO_PASSWORD=<set-a-password>
+SPOOK_SHACK_EXTRA_ADMIN_PASSWORD=<set-a-password>
 PORT=8080
 ```
 
@@ -63,7 +69,7 @@ TELEGRAM_CHANNEL=
 ### Hostinger / GHCR
 
 1. In Hostinger Docker Manager, use `docker-compose.hostinger.yml`.
-2. Set `SPOOK_SHACK_DEMO_PASSWORD=SpookShack123!` in hPanel (or your own value).
+2. Set `SPOOK_SHACK_DEMO_PASSWORD` and `SPOOK_SHACK_EXTRA_ADMIN_PASSWORD` in hPanel.
 3. Attach your domain `spook-shack.com` (and optionally `www.spook-shack.com`) to the container service.
 4. If you prefer GHCR pulls instead of building from source, publish the release image and set `SPOOK_SHACK_V2_IMAGE_TAG=v1.0.0` in hPanel.
 

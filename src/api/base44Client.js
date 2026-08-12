@@ -1,23 +1,11 @@
 const isBrowser = typeof window !== "undefined";
-const TOKEN_KEY = "spook-shack-token";
-
-function shouldPersistTokenInStorage() {
-  if (!isBrowser) return false;
-  return window.location.protocol !== "https:";
-}
 
 function getStoredToken() {
-  if (!shouldPersistTokenInStorage()) return null;
-  return window.sessionStorage.getItem(TOKEN_KEY);
+  return null;
 }
 
-function setStoredToken(token) {
-  if (!shouldPersistTokenInStorage()) return;
-  if (!token) {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-    return;
-  }
-  window.sessionStorage.setItem(TOKEN_KEY, token);
+function setStoredToken(_token) {
+  // Intentionally no-op: auth is cookie-backed.
 }
 
 async function request(path, { method = "GET", body, auth = true } = {}) {
