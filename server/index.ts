@@ -337,6 +337,60 @@ function seedState({ includeUsers = true } = {}) {
   };
 }
 
+function ensureDemoAccounts(state) {
+  if (!DEMO_PASSWORD) return false;
+  const templates = [
+    {
+      email: DEMO_ADMIN_EMAIL,
+      full_name: "Spook Shack Admin",
+      role: "admin",
+    },
+    {
+      email: DEMO_USER_EMAIL,
+      full_name: "Field Analyst",
+      role: "user",
+    },
+  ];
+
+  let changed = false;
+  for (const template of templates) {
+    const email = String(template.email || "").toLowerCase();
+    let existing = state.users.find((user) => String(user.email || "").toLowerCase() === email);
+    if (!existing) {
+      state.users.push({
+        id: makeId("usr"),
+        created_date: nowIso(),
+        email: template.email,
+        full_name: template.full_name,
+        role: template.role,
+        status: "active",
+        password_hash: hashPassword(DEMO_PASSWORD),
+      });
+      changed = true;
+      continue;
+    }
+
+    if (existing.full_name !== template.full_name) {
+      existing.full_name = template.full_name;
+      changed = true;
+    }
+    if (existing.role !== template.role) {
+      existing.role = template.role;
+      changed = true;
+    }
+    if (existing.status !== "active") {
+      existing.status = "active";
+      changed = true;
+    }
+    if (!verifyPassword(DEMO_PASSWORD, existing.password_hash)) {
+      existing.password_hash = hashPassword(DEMO_PASSWORD);
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
 function ensureBootstrapAccounts(state) {
   if (!EXTRA_ADMIN_PASSWORD) return false;
   const targetEmail = EXTRA_ADMIN_EMAIL.toLowerCase();
@@ -564,12 +618,15 @@ function loadState() {
       for (const key of COLLECTION_KEYS) {
         if (!state[key]?.length) state[key] = seededCollections[key];
       }
+      if (ensureDemoAccounts(state) | 0) {
+        // no-op; state is already mutated in place
+      }
       if (EXTRA_ADMIN_PASSWORD) ensureBootstrapAccounts(state);
       persistState(state);
       return state;
     }
 
-    if (!state.users?.length && DEMO_PASSWORD) state.users = seedState({ includeUsers: true }).users;
+    if (ensureDemoAccounts(state)) persistState(state);
     for (const key of COLLECTION_KEYS) {
       if (!state[key]?.length) state[key] = seededCollections[key];
     }
@@ -577,6 +634,7 @@ function loadState() {
     return state;
   } catch (_err) {
     const state = seedState({ includeUsers: Boolean(DEMO_PASSWORD) });
+    ensureDemoAccounts(state);
     if (EXTRA_ADMIN_PASSWORD) ensureBootstrapAccounts(state);
     persistState(state);
     return state;
