@@ -3,6 +3,7 @@ import * as http from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_SOURCES, nowIso } from "../base44/shared/intel.ts";
 import { fetchSource } from "../base44/shared/fetcher.ts";
@@ -11,7 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = path.join(ROOT, "data");
-const DATA_FILE = path.join(DATA_DIR, "spook-shack.json");
+const LEGACY_DATA_FILE = path.join(DATA_DIR, "spook-shack.json");
+const DB_FILE = path.join(DATA_DIR, "spook-shack.db");
 const DIST_DIR = path.join(ROOT, "dist");
 const PORT = Number(process.env.PORT || 8787);
 const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD || "SpookShack123!";
@@ -29,6 +31,8 @@ const ENTITY_MAP = {
   TechForecast: "forecasts",
   User: "users",
 };
+
+const COLLECTION_KEYS = ["sources", "items", "runs", "notes", "reports", "forecasts"];
 
 function slugify(value) {
   return String(value || "")
@@ -362,27 +366,185 @@ function ensureStateShape(raw) {
   return state;
 }
 
+let database;
+
+function openDatabase() {
+  if (database) return database;
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  database = new DatabaseSync(DB_FILE);
+  database.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      created_date TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      status TEXT NOT NULL,
+      password_hash TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS pending_otps (
+      email TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      user_id TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS records (
+      collection TEXT NOT NULL,
+      id TEXT NOT NULL,
+      created_date TEXT NOT NULL,
+      updated_date TEXT NOT NULL DEFAULT '',
+      created_by_id TEXT NOT NULL DEFAULT '',
+      payload TEXT NOT NULL,
+      PRIMARY KEY (collection, id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_records_collection_created_date ON records(collection, created_date);
+  `);
+  return database;
+}
+
+function persistState(state) {
+  const db = openDatabase();
+  db.exec("BEGIN IMMEDIATE TRANSACTION");
+  try {
+    db.exec("DELETE FROM users; DELETE FROM sessions; DELETE FROM pending_otps; DELETE FROM password_resets; DELETE FROM records;");
+
+    const insertUser = db.prepare(
+      "INSERT INTO users (id, created_date, email, full_name, role, status, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    );
+    for (const user of state.users || []) {
+      insertUser.run(user.id, user.created_date, user.email, user.full_name, user.role, user.status, user.password_hash);
+    }
+
+    const insertSession = db.prepare("INSERT INTO sessions (token, user_id) VALUES (?, ?)");
+    for (const [token, userId] of Object.entries(state.sessions || {})) {
+      insertSession.run(token, userId);
+    }
+
+    const insertOtp = db.prepare("INSERT INTO pending_otps (email, code, expires_at, user_id) VALUES (?, ?, ?, ?)");
+    for (const [email, entry] of Object.entries(state.pendingOtps || {})) {
+      insertOtp.run(email, entry.code, Number(entry.expires_at || 0), entry.user_id);
+    }
+
+    const insertReset = db.prepare("INSERT INTO password_resets (token, user_id, expires_at) VALUES (?, ?, ?)");
+    for (const [token, entry] of Object.entries(state.passwordResets || {})) {
+      insertReset.run(token, entry.user_id, Number(entry.expires_at || 0));
+    }
+
+    const insertRecord = db.prepare(
+      "INSERT INTO records (collection, id, created_date, updated_date, created_by_id, payload) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    for (const collection of COLLECTION_KEYS) {
+      for (const item of state[collection] || []) {
+        insertRecord.run(
+          collection,
+          item.id,
+          item.created_date || nowIso(),
+          item.updated_date || "",
+          item.created_by_id || "",
+          JSON.stringify(item),
+        );
+      }
+    }
+
+    db.exec("COMMIT");
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch (_rollbackErr) {
+      // ignore rollback failures; original error is what matters
+    }
+    throw err;
+  }
+}
+
+function hydrateStateFromDb() {
+  const db = openDatabase();
+  const state = {
+    users: [],
+    sessions: {},
+    pendingOtps: {},
+    passwordResets: {},
+    sources: [],
+    items: [],
+    runs: [],
+    notes: [],
+    reports: [],
+    forecasts: [],
+  };
+
+  for (const row of db.prepare("SELECT id, created_date, email, full_name, role, status, password_hash FROM users ORDER BY created_date ASC, id ASC").iterate()) {
+    state.users.push(row);
+  }
+
+  for (const row of db.prepare("SELECT token, user_id FROM sessions").iterate()) {
+    state.sessions[row.token] = row.user_id;
+  }
+
+  for (const row of db.prepare("SELECT email, code, expires_at, user_id FROM pending_otps").iterate()) {
+    state.pendingOtps[row.email] = { code: row.code, expires_at: Number(row.expires_at), user_id: row.user_id };
+  }
+
+  for (const row of db.prepare("SELECT token, user_id, expires_at FROM password_resets").iterate()) {
+    state.passwordResets[row.token] = { user_id: row.user_id, expires_at: Number(row.expires_at) };
+  }
+
+  for (const row of db.prepare("SELECT collection, payload FROM records ORDER BY created_date DESC, rowid DESC").iterate()) {
+    if (!COLLECTION_KEYS.includes(row.collection)) continue;
+    try {
+      state[row.collection].push(JSON.parse(row.payload));
+    } catch (_err) {
+      // ignore malformed rows and keep loading the rest
+    }
+  }
+
+  return ensureStateShape(state);
+}
+
 function loadState() {
   try {
-    if (!fs.existsSync(DATA_FILE)) {
-      const state = seedState();
+    const legacyState = fs.existsSync(LEGACY_DATA_FILE) ? ensureStateShape(JSON.parse(fs.readFileSync(LEGACY_DATA_FILE, "utf8"))) : null;
+    const dbExists = fs.existsSync(DB_FILE);
+    let state = dbExists ? hydrateStateFromDb() : null;
+
+    if (!state || (!state.users?.length && !state.sources?.length && !state.items?.length && !state.runs?.length && !state.notes?.length && !state.reports?.length && !state.forecasts?.length)) {
+      state = legacyState || seedState();
+      state = ensureStateShape(state);
+      if (!state.users?.length) {
+        const seeded = seedState();
+        state.users = seeded.users;
+        for (const key of COLLECTION_KEYS) {
+          if (!state[key]?.length) state[key] = seeded[key];
+        }
+      }
       ensureBootstrapAccounts(state);
       persistState(state);
       return state;
     }
-    const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-    const state = ensureStateShape(parsed);
-    if (!state.users?.length) {
-      const seeded = seedState();
-      state.users = seeded.users;
-      state.sources ||= seeded.sources;
-      state.items ||= seeded.items;
-      state.reports ||= seeded.reports;
-      state.forecasts ||= seeded.forecasts;
+
+    const seeded = seedState();
+    if (!state.users?.length) state.users = seeded.users;
+    for (const key of COLLECTION_KEYS) {
+      if (!state[key]?.length) state[key] = seeded[key];
     }
-    if (ensureBootstrapAccounts(state)) {
-      persistState(state);
-    }
+    if (ensureBootstrapAccounts(state)) persistState(state);
     return state;
   } catch (_err) {
     const state = seedState();
@@ -390,11 +552,6 @@ function loadState() {
     persistState(state);
     return state;
   }
-}
-
-function persistState(state) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
 }
 
 let state = loadState();

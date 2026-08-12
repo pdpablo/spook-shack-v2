@@ -8,7 +8,7 @@ Spook Shack V2 is a self-hosted threat-intelligence workspace for ingesting publ
 - Scheduled ingestion with per-source rate limits
 - Telegram channel ingestion for vulnerability alerts and CVE posts
 - Feed filtering, source dashboards, and correlation views
-- Local JSON persistence with a built-in Node backend
+- SQLite-backed persistence with a built-in Node backend and legacy JSON migration
 - Docker-first deployment
 
 ## Local development
