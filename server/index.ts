@@ -18,6 +18,7 @@ const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD || "SpookShack123!";
 const DEMO_ADMIN_EMAIL = process.env.SPOOK_SHACK_ADMIN_EMAIL || "admin@spook.shack";
 const DEMO_USER_EMAIL = process.env.SPOOK_SHACK_USER_EMAIL || "analyst@spook.shack";
 const EXTRA_ADMIN_EMAIL = process.env.SPOOK_SHACK_EXTRA_ADMIN_EMAIL || "whosjack02@gmail.com";
+const EXTRA_ADMIN_PASSWORD = process.env.SPOOK_SHACK_EXTRA_ADMIN_PASSWORD || "N89s6NzaL1Qa1TNU998f2F7tMMxnlULC";
 
 const ENTITY_MAP = {
   IntelSource: "sources",
@@ -332,7 +333,7 @@ function ensureBootstrapAccounts(state) {
       full_name: "Whosjack02",
       role: "admin",
       status: "active",
-      password_hash: hashPassword(DEMO_PASSWORD),
+      password_hash: hashPassword(EXTRA_ADMIN_PASSWORD),
     });
     return true;
   }
@@ -344,6 +345,10 @@ function ensureBootstrapAccounts(state) {
   }
   if (existing.status !== "active") {
     existing.status = "active";
+    changed = true;
+  }
+  if (!verifyPassword(EXTRA_ADMIN_PASSWORD, existing.password_hash)) {
+    existing.password_hash = hashPassword(EXTRA_ADMIN_PASSWORD);
     changed = true;
   }
   return changed;
