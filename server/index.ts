@@ -16,18 +16,11 @@ const LEGACY_DATA_FILE = path.join(DATA_DIR, "spook-shack.json");
 const DB_FILE = path.join(DATA_DIR, "spook-shack.db");
 const DIST_DIR = path.join(ROOT, "dist");
 const PORT = Number(process.env.PORT || 8787);
-const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD;
+const DEMO_PASSWORD = process.env.SPOOK_SHACK_DEMO_PASSWORD || null;
 const DEMO_ADMIN_EMAIL = process.env.SPOOK_SHACK_ADMIN_EMAIL || "admin@spook.shack";
 const DEMO_USER_EMAIL = process.env.SPOOK_SHACK_USER_EMAIL || "analyst@spook.shack";
 const EXTRA_ADMIN_EMAIL = process.env.SPOOK_SHACK_EXTRA_ADMIN_EMAIL || "whosjack02@gmail.com";
-const EXTRA_ADMIN_PASSWORD = process.env.SPOOK_SHACK_EXTRA_ADMIN_PASSWORD;
-
-if (!DEMO_PASSWORD) {
-  throw new Error("SPOOK_SHACK_DEMO_PASSWORD is required");
-}
-if (!EXTRA_ADMIN_PASSWORD) {
-  throw new Error("SPOOK_SHACK_EXTRA_ADMIN_PASSWORD is required");
-}
+const EXTRA_ADMIN_PASSWORD = process.env.SPOOK_SHACK_EXTRA_ADMIN_PASSWORD || null;
 const AUTO_INGEST_ENABLED = process.env.SPOOK_SHACK_DISABLE_SCHEDULER !== "1";
 const AUTO_INGEST_START_DELAY_MS = Number(process.env.SPOOK_SHACK_SCHEDULER_START_DELAY_MS || 15_000);
 const AUTO_INGEST_INTERVAL_MS = Number(process.env.SPOOK_SHACK_SCHEDULER_INTERVAL_MS || 30 * 60_000);
@@ -311,7 +304,7 @@ function seededSources() {
   }));
 }
 
-function seedState() {
+function seedState({ includeUsers = true } = {}) {
   const admin = {
     id: makeId("usr"),
     created_date: nowIso(),
@@ -331,7 +324,7 @@ function seedState() {
     password_hash: hashPassword(DEMO_PASSWORD),
   };
   return {
-    users: [admin, analyst],
+    users: includeUsers && DEMO_PASSWORD ? [admin, analyst] : [],
     sessions: {},
     pendingOtps: {},
     passwordResets: {},
@@ -345,6 +338,7 @@ function seedState() {
 }
 
 function ensureBootstrapAccounts(state) {
+  if (!EXTRA_ADMIN_PASSWORD) return false;
   const targetEmail = EXTRA_ADMIN_EMAIL.toLowerCase();
   let existing = state.users.find((user) => String(user.email || "").toLowerCase() === targetEmail);
   if (!existing) {
@@ -556,35 +550,34 @@ function hydrateStateFromDb() {
 
 function loadState() {
   try {
+    const seededCollections = seedState({ includeUsers: false });
     const legacyState = fs.existsSync(LEGACY_DATA_FILE) ? ensureStateShape(JSON.parse(fs.readFileSync(LEGACY_DATA_FILE, "utf8"))) : null;
     const dbExists = fs.existsSync(DB_FILE);
     let state = dbExists ? hydrateStateFromDb() : null;
 
     if (!state || (!state.users?.length && !state.sources?.length && !state.items?.length && !state.runs?.length && !state.notes?.length && !state.reports?.length && !state.forecasts?.length)) {
-      state = legacyState || seedState();
+      state = legacyState || seededCollections;
       state = ensureStateShape(state);
-      if (!state.users?.length) {
-        const seeded = seedState();
-        state.users = seeded.users;
-        for (const key of COLLECTION_KEYS) {
-          if (!state[key]?.length) state[key] = seeded[key];
-        }
+      if (!state.users?.length && DEMO_PASSWORD) {
+        state.users = seedState({ includeUsers: true }).users;
       }
-      ensureBootstrapAccounts(state);
+      for (const key of COLLECTION_KEYS) {
+        if (!state[key]?.length) state[key] = seededCollections[key];
+      }
+      if (EXTRA_ADMIN_PASSWORD) ensureBootstrapAccounts(state);
       persistState(state);
       return state;
     }
 
-    const seeded = seedState();
-    if (!state.users?.length) state.users = seeded.users;
+    if (!state.users?.length && DEMO_PASSWORD) state.users = seedState({ includeUsers: true }).users;
     for (const key of COLLECTION_KEYS) {
-      if (!state[key]?.length) state[key] = seeded[key];
+      if (!state[key]?.length) state[key] = seededCollections[key];
     }
-    if (ensureBootstrapAccounts(state)) persistState(state);
+    if (EXTRA_ADMIN_PASSWORD && ensureBootstrapAccounts(state)) persistState(state);
     return state;
   } catch (_err) {
-    const state = seedState();
-    ensureBootstrapAccounts(state);
+    const state = seedState({ includeUsers: Boolean(DEMO_PASSWORD) });
+    if (EXTRA_ADMIN_PASSWORD) ensureBootstrapAccounts(state);
     persistState(state);
     return state;
   }
