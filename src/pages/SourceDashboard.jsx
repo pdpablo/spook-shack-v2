@@ -12,12 +12,17 @@ import CorrelationList from "@/components/dash/CorrelationList";
 import ItemRow from "@/components/intel/ItemRow";
 import NoteDialog from "@/components/intel/NoteDialog";
 import { countBy, dailyVolume, correlations } from "@/lib/correlate";
+import { downloadItemsCsv, downloadItemsStix } from "@/lib/intelExports";
 import { ArrowLeft, Database, CheckCircle2, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function SourceDashboard() {
   const { slug } = useParams();
   const qc = useQueryClient();
   const [active, setActive] = useState(null);
+  const [q, setQ] = useState("");
+  const [dateRange, setDateRange] = useState("30d");
 
   const { data: sources } = useQuery({
     queryKey: ["sources"],
@@ -41,6 +46,23 @@ export default function SourceDashboard() {
     return correlations(pool).filter((c) => c.sources.length > 1);
   }, [rows, all, slug]);
 
+  const filteredRows = useMemo(() => {
+    const needle = q.toLowerCase().trim();
+    const cutoff = dateRange === "all" ? 0 : dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90;
+    const since = cutoff ? Date.now() - cutoff * 86400000 : 0;
+    return rows.filter((row) => {
+      if (cutoff) {
+        const when = Date.parse(row.published_date || row.created_date || "");
+        if (Number.isNaN(when) || when < since) return false;
+      }
+      if (!needle) return true;
+      return [row.value, row.title, row.summary, row.threat_actor, row.victim_org, row.sector, row.country, (row.tags || []).join(" ")]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [rows, q, dateRange]);
+
   if (isLoading) return <Loader label="loading source deck" />;
 
   return (
@@ -62,16 +84,43 @@ export default function SourceDashboard() {
         <p className="mb-6 text-[11px] font-mono text-accent/80 border-l border-accent/40 pl-3">{source.license_note}</p>
       )}
 
+      <div className="mb-5 flex flex-col xl:flex-row xl:items-center gap-2">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="filter by keyword, actor, IOC, sector or geography"
+          className="bg-card border-border font-mono text-xs xl:max-w-md"
+        />
+        <select
+          value={dateRange}
+          onChange={(e) => setDateRange(e.target.value)}
+          className="bg-card border border-border text-[11px] font-mono stencil px-3 py-2 rounded-sm text-muted-foreground"
+        >
+          <option value="7d">last 7 days</option>
+          <option value="30d">last 30 days</option>
+          <option value="90d">last 90 days</option>
+          <option value="all">all time</option>
+        </select>
+        <div className="flex flex-wrap gap-2 xl:ml-auto">
+          <Button variant="outline" onClick={() => downloadItemsCsv({ source, items: filteredRows })} className="font-mono stencil text-[10px]">
+            csv
+          </Button>
+          <Button variant="outline" onClick={() => downloadItemsStix({ source, items: filteredRows })} className="font-mono stencil text-[10px]">
+            stix
+          </Button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <StatTile label="Records" value={rows.length} icon={Database} />
+        <StatTile label="Records" value={filteredRows.length} icon={Database} />
         <StatTile
           label="True positive"
-          value={rows.filter((r) => r.verdict === "true_positive").length}
+          value={filteredRows.filter((r) => r.verdict === "true_positive").length}
           icon={CheckCircle2}
         />
         <StatTile
           label="False positive"
-          value={rows.filter((r) => r.verdict === "false_positive").length}
+          value={filteredRows.filter((r) => r.verdict === "false_positive").length}
           icon={XCircle}
         />
         <StatTile label="Last pull" value={source?.last_ingested_at ? String(source.last_ingested_at).slice(5, 10) : "—"} hint={source?.last_status} />
@@ -79,10 +128,10 @@ export default function SourceDashboard() {
 
       <div className="grid lg:grid-cols-2 gap-4 mb-4">
         <Panel title="volume · 14 days">
-          <VolumeArea data={dailyVolume(rows)} />
+          <VolumeArea data={dailyVolume(filteredRows)} />
         </Panel>
         <Panel title="record types">
-          <TypeBars data={countBy(rows, "item_type").slice(0, 8)} />
+          <TypeBars data={countBy(filteredRows, "item_type").slice(0, 8)} />
         </Panel>
       </div>
 
@@ -92,7 +141,7 @@ export default function SourceDashboard() {
 
       <Panel title="records">
         <div className="space-y-2">
-          {rows.slice(0, 40).map((i) => (
+          {filteredRows.slice(0, 40).map((i) => (
             <ItemRow key={i.id} item={i} onOpen={setActive} />
           ))}
         </div>

@@ -9,6 +9,7 @@ import ReportCard from "@/components/reports/ReportCard";
 import ReportView from "@/components/reports/ReportView";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { downloadReportPdf, downloadJson } from "@/lib/intelExports";
 
 const PERIODS = ["weekly", "monthly", "quarterly", "annually"];
 
@@ -64,9 +65,19 @@ export default function Reports() {
           ))}
           {!reports?.length && <p className="text-xs font-mono text-muted-foreground">no reports yet</p>}
         </div>
-        <Panel title="report">
+          <Panel title="report">
           {selected ? (
-            <ReportView report={selected} />
+            <div className="space-y-4">
+              <ReportView report={selected} />
+              <div className="flex flex-wrap gap-2 border-t border-border/70 pt-4">
+                <Button variant="outline" onClick={() => downloadReportPdf(selected)} className="font-mono stencil text-[10px]">
+                  download pdf
+                </Button>
+                <Button variant="outline" onClick={() => downloadJson(`report-${selected.period || "intel"}.json`, selected)} className="font-mono stencil text-[10px]">
+                  download json
+                </Button>
+              </div>
+            </div>
           ) : (
             <EmptyState title="no report selected" hint="Generate a weekly, monthly, quarterly or annual report." />
           )}

@@ -1,19 +1,23 @@
+const isBrowser = typeof window !== "undefined";
 const TOKEN_KEY = "spook-shack-token";
 
-const isBrowser = typeof window !== "undefined";
+function shouldPersistTokenInStorage() {
+  if (!isBrowser) return false;
+  return window.location.protocol !== "https:";
+}
 
 function getStoredToken() {
-  if (!isBrowser) return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  if (!shouldPersistTokenInStorage()) return null;
+  return window.sessionStorage.getItem(TOKEN_KEY);
 }
 
 function setStoredToken(token) {
-  if (!isBrowser) return;
+  if (!shouldPersistTokenInStorage()) return;
   if (!token) {
-    window.localStorage.removeItem(TOKEN_KEY);
+    window.sessionStorage.removeItem(TOKEN_KEY);
     return;
   }
-  window.localStorage.setItem(TOKEN_KEY, token);
+  window.sessionStorage.setItem(TOKEN_KEY, token);
 }
 
 async function request(path, { method = "GET", body, auth = true } = {}) {
@@ -24,6 +28,7 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   const res = await fetch(path, {
     method,
     headers,
+    credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
@@ -133,7 +138,12 @@ async function authProvider(provider, returnTo = "/") {
   return data;
 }
 
-function logout(returnTo = "/login") {
+async function logout(returnTo = "/login") {
+  try {
+    await request("/api/auth/logout", { method: "POST" });
+  } catch (_err) {
+    // Best-effort logout; local state still clears below.
+  }
   setStoredToken(null);
   if (!isBrowser) return;
   if (returnTo === false) return;

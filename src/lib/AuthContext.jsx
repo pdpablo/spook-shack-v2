@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { base44, getAccessToken } from '@/api/base44Client';
+import { base44 } from '@/api/base44Client';
 
 const AuthContext = createContext(null);
 
@@ -33,13 +33,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (getAccessToken()) {
-      void checkUserAuth();
-    } else {
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
-      setAuthError(null);
-    }
+    void checkUserAuth();
   }, []);
 
   const logout = (shouldRedirect = true) => {

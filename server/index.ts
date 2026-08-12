@@ -21,6 +21,17 @@ const DEMO_ADMIN_EMAIL = process.env.SPOOK_SHACK_ADMIN_EMAIL || "admin@spook.sha
 const DEMO_USER_EMAIL = process.env.SPOOK_SHACK_USER_EMAIL || "analyst@spook.shack";
 const EXTRA_ADMIN_EMAIL = process.env.SPOOK_SHACK_EXTRA_ADMIN_EMAIL || "whosjack02@gmail.com";
 const EXTRA_ADMIN_PASSWORD = process.env.SPOOK_SHACK_EXTRA_ADMIN_PASSWORD || "N89s6NzaL1Qa1TNU998f2F7tMMxnlULC";
+const AUTO_INGEST_ENABLED = process.env.SPOOK_SHACK_DISABLE_SCHEDULER !== "1";
+const AUTO_INGEST_START_DELAY_MS = Number(process.env.SPOOK_SHACK_SCHEDULER_START_DELAY_MS || 15_000);
+const AUTO_INGEST_INTERVAL_MS = Number(process.env.SPOOK_SHACK_SCHEDULER_INTERVAL_MS || 30 * 60_000);
+const AUTH_COOKIE_NAME = "spook_shack_token";
+
+function isSecureRequest(req) {
+  const forwardedProto = String(req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase();
+  if (forwardedProto === "https") return true;
+  const host = String(req?.headers?.host || "").toLowerCase();
+  return process.env.NODE_ENV === "production" && host && !host.startsWith("localhost") && !host.startsWith("127.0.0.1") && !host.startsWith("[::1]");
+}
 
 const ENTITY_MAP = {
   IntelSource: "sources",
@@ -358,6 +369,24 @@ function ensureBootstrapAccounts(state) {
   return changed;
 }
 
+function authCookieHeader(token, secure, maxAgeSeconds = 7 * 24 * 60 * 60) {
+  return `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}; Max-Age=${maxAgeSeconds}`;
+}
+
+function clearAuthCookieHeader(secure) {
+  return `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}; Max-Age=0`;
+}
+
+function readCookieValue(cookieHeader, name) {
+  for (const part of String(cookieHeader || "").split(/;\s*/)) {
+    const idx = part.indexOf("=");
+    if (idx < 0) continue;
+    const key = part.slice(0, idx).trim();
+    if (key === name) return decodeURIComponent(part.slice(idx + 1));
+  }
+  return "";
+}
+
 function ensureStateShape(raw) {
   const state = raw && typeof raw === "object" ? raw : {};
   for (const key of ["users", "sessions", "pendingOtps", "passwordResets", "sources", "items", "runs", "notes", "reports", "forecasts"]) {
@@ -567,7 +596,8 @@ function getCollectionName(name) {
 function currentUserFromRequest(req) {
   const auth = req.headers.authorization || "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  const token = bearer || req.headers["x-spook-token"] || "";
+  const cookieToken = readCookieValue(req.headers.cookie || "", AUTH_COOKIE_NAME);
+  const token = bearer || req.headers["x-spook-token"] || cookieToken || "";
   if (!token) return null;
   const userId = state.sessions[token];
   if (!userId) return null;
@@ -593,8 +623,8 @@ function requireAdmin(req, res) {
   return user;
 }
 
-function sendJson(res, status, body) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+function sendJson(res, status, body, headers = {}) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", ...headers });
   res.end(JSON.stringify(body));
 }
 
@@ -664,6 +694,7 @@ function updateEntity(name, id, patch, currentUser) {
   const idx = col.findIndex((i) => i.id === id);
   if (idx < 0) throw new Error("not_found");
   const existing = col[idx];
+  if (name === "ItemNote" && currentUser?.role !== "admin" && existing.created_by_id !== currentUser?.id) throw new Error("forbidden");
   const next = { ...existing, ...deepClone(patch), updated_date: nowIso() };
   if (name === "User" && currentUser?.role !== "admin" && currentUser?.id !== id) throw new Error("forbidden");
   col[idx] = next;
@@ -671,12 +702,13 @@ function updateEntity(name, id, patch, currentUser) {
   return next;
 }
 
-function deleteEntity(name, id) {
+function deleteEntity(name, id, currentUser) {
   const collectionName = getCollectionName(name);
   if (!collectionName) throw new Error(`unknown entity: ${name}`);
   const col = state[collectionName];
   const idx = col.findIndex((i) => i.id === id);
   if (idx < 0) throw new Error("not_found");
+  if (name === "ItemNote" && currentUser?.role !== "admin" && col[idx].created_by_id !== currentUser?.id) throw new Error("forbidden");
   const [removed] = col.splice(idx, 1);
   save();
   return removed;
@@ -997,7 +1029,7 @@ async function handleAuth(req, res, action, body) {
       return sendJson(res, 403, { error: "email_not_verified" });
     }
     const access_token = createSessionForUser(user);
-    return sendJson(res, 200, { access_token, user: publicUser(user) });
+    return sendJson(res, 200, { access_token, user: publicUser(user) }, { "Set-Cookie": authCookieHeader(access_token, isSecureRequest(req)) });
   }
 
   if (action === "provider") {
@@ -1016,7 +1048,7 @@ async function handleAuth(req, res, action, body) {
       state.users.push(user);
     }
     const access_token = createSessionForUser(user);
-    return sendJson(res, 200, { access_token, user: publicUser(user), redirect_url: body.returnTo || "/" });
+    return sendJson(res, 200, { access_token, user: publicUser(user), redirect_url: body.returnTo || "/" }, { "Set-Cookie": authCookieHeader(access_token, isSecureRequest(req)) });
   }
 
   if (action === "register") {
@@ -1062,7 +1094,7 @@ async function handleAuth(req, res, action, body) {
     user.status = "active";
     delete state.pendingOtps[key];
     const access_token = createSessionForUser(user);
-    return sendJson(res, 200, { access_token, user: publicUser(user) });
+    return sendJson(res, 200, { access_token, user: publicUser(user) }, { "Set-Cookie": authCookieHeader(access_token, isSecureRequest(req)) });
   }
 
   if (action === "forgot-password") {
@@ -1091,7 +1123,7 @@ async function handleAuth(req, res, action, body) {
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
     if (token && state.sessions[token]) delete state.sessions[token];
     save();
-    return sendJson(res, 200, { success: true });
+    return sendJson(res, 200, { success: true }, { "Set-Cookie": clearAuthCookieHeader(isSecureRequest(req)) });
   }
 
   if (action === "me") {
@@ -1117,6 +1149,9 @@ function publicUser(user) {
 async function handleEntityQuery(req, res, entityName, body) {
   const user = requireAuth(req, res);
   if (!user) return;
+  if (entityName === "User" && user.role !== "admin") {
+    return sendJson(res, 403, { error: "admin_required" });
+  }
   const query = body?.query || {};
   const sort = body?.sort || "-created_date";
   const limit = body?.limit || 1000;
@@ -1162,7 +1197,7 @@ async function handleEntityDelete(req, res, entityName, id) {
     return sendJson(res, 403, { error: "admin_required" });
   }
   try {
-    const deleted = deleteEntity(entityName, id);
+    const deleted = deleteEntity(entityName, id, user);
     return sendJson(res, 200, deepClone(deleted));
   } catch {
     return sendJson(res, 404, { error: "not_found" });
@@ -1221,6 +1256,33 @@ async function handleFunction(req, res, name, body) {
     return sendJson(res, 200, { created });
   }
   return sendJson(res, 404, { error: "unknown_function" });
+}
+
+let autoIngestActive = false;
+
+function isSourceDueForAutoIngest(source, now = Date.now()) {
+  if (!source || source.status !== "active") return false;
+  const last = source.last_ingested_at ? Date.parse(source.last_ingested_at) : 0;
+  const minMs = Number(source.min_interval_minutes || 0) * 60_000;
+  return !last || Number.isNaN(last) || now - last >= minMs;
+}
+
+async function runAutoIngestSweep(trigger = "interval") {
+  if (autoIngestActive) return;
+  autoIngestActive = true;
+  try {
+    const dueSources = state.sources.filter((source) => isSourceDueForAutoIngest(source));
+    for (const source of dueSources) {
+      await ingestSource(source, {});
+    }
+    if (dueSources.length) {
+      console.log(`[spook-shack] auto-ingest ${trigger}: processed ${dueSources.length} source(s)`);
+    }
+  } catch (err) {
+    console.error(`[spook-shack] auto-ingest ${trigger} failed`, err);
+  } finally {
+    autoIngestActive = false;
+  }
 }
 
 function contentType(filePath) {
@@ -1325,6 +1387,13 @@ async function handleRequest(req, res) {
 const server = http.createServer((req, res) => {
   void handleRequest(req, res);
 });
+
+if (AUTO_INGEST_ENABLED) {
+  const kickoff = setTimeout(() => void runAutoIngestSweep("startup"), AUTO_INGEST_START_DELAY_MS);
+  kickoff.unref?.();
+  const interval = setInterval(() => void runAutoIngestSweep("interval"), AUTO_INGEST_INTERVAL_MS);
+  interval.unref?.();
+}
 
 server.listen(PORT, () => {
   console.log(`[spook-shack] server listening on http://127.0.0.1:${PORT}`);
